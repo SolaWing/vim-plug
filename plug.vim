@@ -1310,8 +1310,12 @@ function! s:update_finish()
       else
         let branch = s:git_origin_branch(spec)
         call s:log4(name, 'Merging origin/'.s:esc(branch))
-        let out = s:system('git checkout -q '.plug#shellescape(branch).' -- 2>&1'
-              \. (has_key(s:update.new, name) ? '' : ('&& git merge --ff-only '.plug#shellescape('origin/'.branch).' 2>&1')), spec.dir)
+        if has_key(s:update.new, name)
+            let l:cmd = 'git checkout -q '.plug#shellescape(branch).' -- 2>&1'
+        else
+            let l:cmd = 'git merge origin/'.plug#shellescape(branch).' 2>&1'
+        endif
+        let out = s:system(l:cmd, spec.dir)
       endif
       if !v:shell_error && filereadable(spec.dir.'/.gitmodules') &&
             \ (s:update.force || has_key(s:update.new, name) || s:is_updated(spec.dir))
@@ -2346,22 +2350,9 @@ function! s:git_validate(spec, check_branch)
               \ current_branch, origin_branch)
       endif
       if empty(err)
-        let [ahead, behind] = split(s:lastline(s:system([
-        \ 'git', 'rev-list', '--count', '--left-right',
-        \ printf('HEAD...origin/%s', origin_branch)
-        \ ], a:spec.dir)), '\t')
-        if !v:shell_error && ahead
-          if behind
-            " Only mention PlugClean if diverged, otherwise it's likely to be
-            " pushable (and probably not that messed up).
-            let err = printf(
-                  \ "Diverged from origin/%s (%d commit(s) ahead and %d commit(s) behind!\n"
-                  \ .'Backup local changes and run PlugClean and PlugUpdate to reinstall it.', origin_branch, ahead, behind)
-          else
-            let err = printf("Ahead of origin/%s by %d commit(s).\n"
-                  \ .'Cannot update until local changes are pushed.',
-                  \ origin_branch, ahead)
-          endif
+        let commits = len(s:lines(s:system(printf('git rev-list origin/%s..HEAD', a:spec.branch), a:spec.dir)))
+        if !v:shell_error && commits
+            let err = printf('Diverged from origin/%s by %d commit(s).', a:spec.branch, commits)
         endif
       endif
     endif
