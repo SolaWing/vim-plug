@@ -1310,12 +1310,9 @@ function! s:update_finish()
       else
         let branch = s:git_origin_branch(spec)
         call s:log4(name, 'Merging origin/'.s:esc(branch))
-        if has_key(s:update.new, name)
-            let l:cmd = 'git checkout -q '.plug#shellescape(branch).' -- 2>&1'
-        else
-            let l:cmd = 'git merge origin/'.plug#shellescape(branch).' 2>&1'
-        endif
-        let out = s:system(l:cmd, spec.dir)
+        " checkout can change reflog, so only see the recent update diff
+        let out = s:system('git checkout -q '.plug#shellescape(branch).' -- 2>&1'
+              \. (has_key(s:update.new, name) ? '' : ('&& git merge origin/'.plug#shellescape(branch).' 2>&1')), spec.dir)
       endif
       if !v:shell_error && filereadable(spec.dir.'/.gitmodules') &&
             \ (s:update.force || has_key(s:update.new, name) || s:is_updated(spec.dir))
